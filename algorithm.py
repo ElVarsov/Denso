@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 class Car:
     def __init__(self, name, charging_speed_W, battery_capacity_Wh, commute_distance_km, 
                  battery_usage_Wh_per_km, battery_left_percentage, arrival_hour, departure_hour):
+        # Initialize car attributes
         self.name = name
         self.charging_speed_W = charging_speed_W
         self.battery_capacity_Wh = battery_capacity_Wh
@@ -33,19 +34,29 @@ class Car:
         return f"Car({self.name})"
 
 def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour=24):
-    slots_per_hour = 60 // time_slot_minutes
-    total_slots = (end_hour - start_hour) * slots_per_hour
-    prob = pulp.LpProblem("EV_Charging_Schedule", pulp.LpMaximize)
-    x = {}
+    # Create a linear programming problem to optimize charging schedule
+    slots_per_hour = 60 // time_slot_minutes  # Number of slots per hour
+    total_slots = (end_hour - start_hour) * slots_per_hour  # Total number of slots in the day
+    prob = pulp.LpProblem("EV_Charging_Schedule", pulp.LpMaximize)  # Define the optimization problem
+    x = {}  # Decision variables for whether a car is charging in a specific slot
+    
+    # Define decision variables for each car and time slot
     for car in cars:
         x[car] = {}
         for slot in range(total_slots):
             slot_hour = start_hour + (slot * time_slot_minutes) / 60
             if slot_hour >= car.arrival_hour and slot_hour < car.departure_hour:
-                x[car][slot] = pulp.LpVariable(f"x_{car.name}_{slot}", cat='Binary')
+                x[car][slot] = pulp.LpVariable(f"x_{car.name}_{slot}", cat='Binary')  # Binary variable
             else:
-                x[car][slot] = 0
+                x[car][slot] = 0  # Not allowed to charge outside arrival and departure hours
     
+    # Add constraint to ensure battery does not exceed 100%
+    for car in cars:
+        max_energy_Wh = car.battery_capacity_Wh - (car.battery_capacity_Wh * (car.battery_left_percentage / 100))
+        max_slots = max_energy_Wh / (car.charging_speed_W * (time_slot_minutes / 60))
+        prob += pulp.lpSum(x[car][slot] for slot in range(total_slots) if isinstance(x[car][slot], pulp.LpVariable)) <= max_slots
+    
+    # Define transition variables to minimize the number of charging interruptions
     transitions = {}
     for car in cars:
         transitions[car] = {}
@@ -55,11 +66,14 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
                 prob += transitions[car][slot] >= x[car][slot] - x[car][slot-1]
                 prob += transitions[car][slot] >= x[car][slot-1] - x[car][slot]
     
+    # Constraint: Only one car can charge in a time slot
     for slot in range(total_slots):
         prob += pulp.lpSum(x[car][slot] for car in cars if isinstance(x[car][slot], pulp.LpVariable)) <= 1
     
+    # Define the objective function
     objective_components = []
     
+    # Maximize minimum charging time for each car
     for car in cars:
         min_slots_needed = int(car.calculate_min_charging_time_hours() * slots_per_hour)
         car_total_slots = pulp.lpSum(x[car][slot] for slot in range(total_slots) if isinstance(x[car][slot], pulp.LpVariable))
@@ -68,18 +82,22 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
         prob += min_charging <= car_total_slots
         objective_components.append(10000 * min_charging)
     
+    # Minimize the number of transitions (charging interruptions)
     for car in cars:
         total_transitions = pulp.lpSum(transitions[car][slot] for slot in transitions[car])
         objective_components.append(-100 * total_transitions)
     
+    # Maximize total charging time for each car
     for car in cars:
         car_total_slots = pulp.lpSum(x[car][slot] for slot in range(total_slots) if isinstance(x[car][slot], pulp.LpVariable))
         objective_components.append(car_total_slots)
     
-    prob += pulp.lpSum(objective_components)
+    prob += pulp.lpSum(objective_components)  # Combine all objectives
     
+    # Solve the optimization problem
     prob.solve(pulp.PULP_CBC_CMD(msg=False))
     
+    # Extract the charging schedule
     schedule = {car: [] for car in cars}
     if pulp.LpStatus[prob.status] == 'Optimal':
         for car in cars:
@@ -91,17 +109,20 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
     return schedule
 
 def visualize_schedule(cars, schedule, time_slot_minutes=15, start_hour=0, end_hour=24):
+    # Visualize the charging schedule using a bar chart
     fig, ax = plt.subplots(figsize=(12, 6))
     
     slots_per_hour = 60 // time_slot_minutes
     total_slots = (end_hour - start_hour) * slots_per_hour
     
-    colors = plt.cm.tab10(np.linspace(0, 1, len(cars)))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(cars)))  # Assign unique colors to cars
     
+    # Draw arrival and departure windows for each car
     for i, car in enumerate(cars):
         ax.add_patch(plt.Rectangle((car.arrival_hour, i-0.4), car.departure_hour - car.arrival_hour, 0.8, 
                                    color=colors[i], alpha=0.1))
     
+    # Draw charging blocks for each car
     for i, car in enumerate(cars):
         charging_blocks = []
         current_block = []
