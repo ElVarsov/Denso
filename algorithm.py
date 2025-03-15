@@ -85,7 +85,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
         
         min_charging = pulp.LpVariable(f"min_charging_{car.name}", lowBound=0, upBound=min_slots_needed)
         prob += min_charging <= car_total_slots
-        objective_components.append(-100 * min_charging)
+        objective_components.append(-10 * min_charging)
     
     # Minimize the number of transitions (charging interruptions)
     for car in cars:
@@ -132,7 +132,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
         prob += average_extra_slots - extra_charging_times[car] <= max_deviation
     
     # Add minimizing the maximum deviation to the objective
-    objective_components.append(10 * max_deviation)
+    objective_components.append(20 * max_deviation)
     
     # Add utilization objective - maximize total charging time
     total_charging = pulp.lpSum(x[car][slot] for car in cars for slot in range(total_slots) 
@@ -142,7 +142,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
     prob += pulp.lpSum(objective_components)  # Combine all objectives
     
     # Solve the optimization problem
-    prob.solve(pulp.PULP_CBC_CMD(msg=True, gapRel=0.01))
+    prob.solve(pulp.PULP_CBC_CMD(msg=True, gapRel=0.011))
     
     # Extract the charging schedule
     schedule = {car: [] for car in cars}
