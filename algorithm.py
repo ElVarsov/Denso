@@ -125,7 +125,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=0.5, start_hour=0, end_ho
     average_extra_slots = int(average_extra_per_car * slots_per_hour)
     
     # Create fairness variable to minimize maximum difference from average
-    max_deviation = pulp.LpVariable("max_deviation", lowBound=0)
+    max_deviation = pulp.LpVariable("max_deviation", lowBound=1)
     for car in cars:
         # Constraint: deviation of extra charging from average can't exceed max_deviation
         prob += extra_charging_times[car] - average_extra_slots <= max_deviation
