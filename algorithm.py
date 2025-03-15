@@ -33,7 +33,7 @@ class Car:
     def __repr__(self):
         return f"Car({self.name})"
 
-def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour=24):
+def optimize_charging_schedule(cars, time_slot_minutes=0.5, start_hour=0, end_hour=24):
     # Create a linear programming problem to optimize charging schedule
     slots_per_hour = 60 // time_slot_minutes  # Number of slots per hour
     total_slots = (end_hour - start_hour) * slots_per_hour  # Total number of slots in the day
@@ -122,10 +122,10 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
     average_extra_per_car = remaining_time / len(cars) if len(cars) > 0 else 0
     
     # Convert to slots
-    average_extra_slots = average_extra_per_car * slots_per_hour
+    average_extra_slots = int(average_extra_per_car * slots_per_hour)
     
     # Create fairness variable to minimize maximum difference from average
-    max_deviation = pulp.LpVariable("max_deviation", lowBound=1)
+    max_deviation = pulp.LpVariable("max_deviation", lowBound=0)
     for car in cars:
         # Constraint: deviation of extra charging from average can't exceed max_deviation
         prob += extra_charging_times[car] - average_extra_slots <= max_deviation
@@ -142,7 +142,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
     prob += pulp.lpSum(objective_components)  # Combine all objectives
     
     # Solve the optimization problem
-    prob.solve(pulp.PULP_CBC_CMD(msg=False))
+    prob.solve(pulp.PULP_CBC_CMD(msg=True))
     
     # Extract the charging schedule
     schedule = {car: [] for car in cars}
@@ -326,7 +326,7 @@ if __name__ == "__main__":
             
         Car("VW ID.4", charging_speed_W=11000, battery_capacity_Wh=77000, 
             commute_distance_km=60, battery_usage_Wh_per_km=180, 
-            battery_left_percentage=35, arrival_hour=10, departure_hour=18),
+            battery_left_percentage=35, arrival_hour=9, departure_hour=17),
     ]
     
     schedule = optimize_charging_schedule(cars, time_slot_minutes=15)
