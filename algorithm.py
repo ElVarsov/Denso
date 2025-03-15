@@ -37,7 +37,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
     # Create a linear programming problem to optimize charging schedule
     slots_per_hour = 60 // time_slot_minutes  # Number of slots per hour
     total_slots = (end_hour - start_hour) * slots_per_hour  # Total number of slots in the day
-    prob = pulp.LpProblem("EV_Charging_Schedule", pulp.LpMaximize)  # Define the optimization problem
+    prob = pulp.LpProblem("EV_Charging_Schedule", pulp.LpMinimize)  # Define the optimization problem
     x = {}  # Decision variables for whether a car is charging in a specific slot
     
     # Define decision variables for each car and time slot
@@ -68,7 +68,12 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
     
     # Constraint: Only one car can charge in a time slot
     for slot in range(total_slots):
-        prob += pulp.lpSum(x[car][slot] for car in cars if isinstance(x[car][slot], pulp.LpVariable)) <= 1
+        # Get cars that can charge in this slot
+        cars_in_slot = [car for car in cars if isinstance(x[car][slot], pulp.LpVariable)]
+        if cars_in_slot:
+            # If at least one car can charge in this slot, prefer to use it
+            # Instead of <= 1, use = 1 if any car is available
+            prob += pulp.lpSum(x[car][slot] for car in cars_in_slot) == 1
     
     # Define the objective function
     objective_components = []
@@ -80,17 +85,59 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
         
         min_charging = pulp.LpVariable(f"min_charging_{car.name}", lowBound=0, upBound=min_slots_needed)
         prob += min_charging <= car_total_slots
-        objective_components.append(10000 * min_charging)
+        objective_components.append(-10000 * min_charging)
     
     # Minimize the number of transitions (charging interruptions)
     for car in cars:
         total_transitions = pulp.lpSum(transitions[car][slot] for slot in transitions[car])
-        objective_components.append(-100 * total_transitions)
+        objective_components.append(100 * total_transitions)
     
-    # Maximize total charging time for each car
+    # Calculate extra charging times
+    extra_charging_times = {}
     for car in cars:
         car_total_slots = pulp.lpSum(x[car][slot] for slot in range(total_slots) if isinstance(x[car][slot], pulp.LpVariable))
-        objective_components.append(car_total_slots)
+        min_slots_needed = int(car.calculate_min_charging_time_hours() * slots_per_hour)
+        extra_charging_times[car] = car_total_slots - min_slots_needed
+    
+    # Calculate constraints for balancing extra charging time
+    first_arrival = min(car.arrival_hour for car in cars)
+    last_departure = max(car.departure_hour for car in cars)
+    total_time_span = last_departure - first_arrival
+    
+    # Calculate total time that must be allocated for minimum charging
+    total_min_charging_time = sum(car.calculate_min_charging_time_hours() for car in cars)
+    
+    # Calculate total available charging slots
+    total_available_slots = 0
+    for slot in range(total_slots):
+        slot_hour = start_hour + (slot * time_slot_minutes) / 60
+        cars_available = [car for car in cars if car.arrival_hour <= slot_hour < car.departure_hour]
+        if cars_available:
+            total_available_slots += 1
+    
+    # Calculate theoretical maximum extra charging time per car
+    # (this assumes perfect distribution which might not be possible given constraints)
+    total_available_time = total_available_slots * (time_slot_minutes / 60)
+    remaining_time = total_available_time - total_min_charging_time
+    average_extra_per_car = remaining_time / len(cars) if len(cars) > 0 else 0
+    
+    # Convert to slots
+    average_extra_slots = average_extra_per_car * slots_per_hour
+    
+    # Create fairness variable to minimize maximum difference from average
+    max_deviation = pulp.LpVariable("max_deviation", lowBound=1)
+    for car in cars:
+        # Constraint: deviation of extra charging from average can't exceed max_deviation
+        prob += extra_charging_times[car] - average_extra_slots <= max_deviation
+        prob += average_extra_slots - extra_charging_times[car] <= max_deviation
+    
+    # Add minimizing the maximum deviation to the objective
+    objective_components.append(1000 * max_deviation)
+    
+    # Add utilization objective - maximize total charging time
+    total_charging = pulp.lpSum(x[car][slot] for car in cars for slot in range(total_slots) 
+                               if isinstance(x[car][slot], pulp.LpVariable))
+    objective_components.append(-10 * total_charging)  # Lower priority than balancing
     
     prob += pulp.lpSum(objective_components)  # Combine all objectives
     
@@ -284,6 +331,13 @@ if __name__ == "__main__":
     schedule = optimize_charging_schedule(cars, time_slot_minutes=15)
     
     analyze_schedule(cars, schedule)
+    
+    for car in cars:
+        total_charging_time_hours = len(schedule[car]) * (15 / 60)
+        charged_energy_Wh = total_charging_time_hours * car.charging_speed_W
+        initial_charge_Wh = car.battery_capacity_Wh * (car.battery_left_percentage / 100)
+        final_charge_percentage = ((initial_charge_Wh + charged_energy_Wh) / car.battery_capacity_Wh) * 100
+        print(f"{car.name} initial charge percentage: {car.battery_left_percentage:.2f}%, final charge percentage: {final_charge_percentage:.2f}%")
     
     fig = visualize_schedule(cars, schedule)
     plt.show()
