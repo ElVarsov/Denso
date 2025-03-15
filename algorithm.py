@@ -33,7 +33,7 @@ class Car:
     def __repr__(self):
         return f"Car({self.name})"
 
-def optimize_charging_schedule(cars, time_slot_minutes=0.5, start_hour=0, end_hour=24):
+def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour=24):
     # Create a linear programming problem to optimize charging schedule
     slots_per_hour = 60 // time_slot_minutes  # Number of slots per hour
     total_slots = (end_hour - start_hour) * slots_per_hour  # Total number of slots in the day
@@ -85,7 +85,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=0.5, start_hour=0, end_ho
         
         min_charging = pulp.LpVariable(f"min_charging_{car.name}", lowBound=0, upBound=min_slots_needed)
         prob += min_charging <= car_total_slots
-        objective_components.append(-10000 * min_charging)
+        objective_components.append(-100 * min_charging)
     
     # Minimize the number of transitions (charging interruptions)
     for car in cars:
@@ -132,7 +132,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=0.5, start_hour=0, end_ho
         prob += average_extra_slots - extra_charging_times[car] <= max_deviation
     
     # Add minimizing the maximum deviation to the objective
-    objective_components.append(1000 * max_deviation)
+    objective_components.append(100 * max_deviation)
     
     # Add utilization objective - maximize total charging time
     total_charging = pulp.lpSum(x[car][slot] for car in cars for slot in range(total_slots) 
@@ -142,7 +142,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=0.5, start_hour=0, end_ho
     prob += pulp.lpSum(objective_components)  # Combine all objectives
     
     # Solve the optimization problem
-    prob.solve(pulp.PULP_CBC_CMD(msg=True))
+    prob.solve(pulp.PULP_CBC_CMD(msg=True, gapRel=0.01))
     
     # Extract the charging schedule
     schedule = {car: [] for car in cars}
@@ -155,7 +155,7 @@ def optimize_charging_schedule(cars, time_slot_minutes=0.5, start_hour=0, end_ho
     
     return schedule
 
-def visualize_schedule(cars, schedule, time_slot_minutes=15, start_hour=0, end_hour=24):
+def visualize_schedule(cars, schedule, time_slot_minutes=5, start_hour=0, end_hour=24):
     # Adjust the figure size dynamically based on the number of cars
     fig, ax = plt.subplots(figsize=(12, max(6, len(cars) * 1.5)))
     
@@ -265,7 +265,7 @@ def visualize_schedule(cars, schedule, time_slot_minutes=15, start_hour=0, end_h
     plt.tight_layout(rect=[0, 0, 1, 0.95])  # Adjust layout to show top and bottom fully
     return fig
 
-def analyze_schedule(cars, schedule, time_slot_minutes=15):
+def analyze_schedule(cars, schedule, time_slot_minutes=5):
     print("Optimized Charging Schedule (One Car at a Time):")
     
     total_min_time_needed = sum(car.calculate_min_charging_time_hours() for car in cars)
@@ -317,7 +317,7 @@ if __name__ == "__main__":
             battery_left_percentage=40, arrival_hour=8, departure_hour=16),
         
         Car("Nissan Leaf", charging_speed_W=6000, battery_capacity_Wh=40000, 
-            commute_distance_km=30, battery_usage_Wh_per_km=150, 
+            commute_distance_km=60, battery_usage_Wh_per_km=150, 
             battery_left_percentage=50, arrival_hour=9, departure_hour=17),
         
         Car("Chevy Bolt", charging_speed_W=7500, battery_capacity_Wh=66000, 
@@ -329,12 +329,12 @@ if __name__ == "__main__":
             battery_left_percentage=35, arrival_hour=9, departure_hour=17),
     ]
     
-    schedule = optimize_charging_schedule(cars, time_slot_minutes=15)
+    schedule = optimize_charging_schedule(cars, time_slot_minutes=5)
     
     analyze_schedule(cars, schedule)
     
     for car in cars:
-        total_charging_time_hours = len(schedule[car]) * (15 / 60)
+        total_charging_time_hours = len(schedule[car]) * (5 / 60)
         charged_energy_Wh = total_charging_time_hours * car.charging_speed_W
         initial_charge_Wh = car.battery_capacity_Wh * (car.battery_left_percentage / 100)
         final_charge_percentage = ((initial_charge_Wh + charged_energy_Wh) / car.battery_capacity_Wh) * 100
