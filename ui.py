@@ -15,11 +15,11 @@ class ChargingSchedulerApp:
         self.name_entry = tk.Entry(root)
         self.name_entry.grid(row=0, column=1)
         
-        tk.Label(root, text="Charging Speed (W):").grid(row=1, column=0)
+        tk.Label(root, text="Charging Speed (kW):").grid(row=1, column=0)
         self.charging_speed_entry = tk.Entry(root)
         self.charging_speed_entry.grid(row=1, column=1)
         
-        tk.Label(root, text="Battery Capacity (Wh):").grid(row=2, column=0)
+        tk.Label(root, text="Battery Capacity (kWh):").grid(row=2, column=0)
         self.battery_capacity_entry = tk.Entry(root)
         self.battery_capacity_entry.grid(row=2, column=1)
         
@@ -27,7 +27,7 @@ class ChargingSchedulerApp:
         self.commute_distance_entry = tk.Entry(root)
         self.commute_distance_entry.grid(row=3, column=1)
         
-        tk.Label(root, text="Battery Usage (Wh/km):").grid(row=4, column=0)
+        tk.Label(root, text="Battery Usage (kWh/100 km):").grid(row=4, column=0)
         self.battery_usage_entry = tk.Entry(root)
         self.battery_usage_entry.grid(row=4, column=1)
         
@@ -52,10 +52,10 @@ class ChargingSchedulerApp:
             # Create a Car object from input fields
             car = Car(
                 name=self.name_entry.get(),
-                charging_speed_W=int(self.charging_speed_entry.get()),
-                battery_capacity_Wh=int(self.battery_capacity_entry.get()),
+                charging_speed_W=1000 * int(self.charging_speed_entry.get()),
+                battery_capacity_Wh=1000 * int(self.battery_capacity_entry.get()),
                 commute_distance_km=float(self.commute_distance_entry.get()),
-                battery_usage_Wh_per_km=float(self.battery_usage_entry.get()),
+                battery_usage_Wh_per_km=10 * float(self.battery_usage_entry.get()),
                 battery_left_percentage=float(self.battery_left_entry.get()),
                 arrival_hour=float(self.arrival_hour_entry.get()),
                 departure_hour=float(self.departure_hour_entry.get())
