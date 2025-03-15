@@ -156,8 +156,8 @@ def optimize_charging_schedule(cars, time_slot_minutes=1, start_hour=0, end_hour
     return schedule
 
 def visualize_schedule(cars, schedule, time_slot_minutes=15, start_hour=0, end_hour=24):
-    # Visualize the charging schedule using a bar chart
-    fig, ax = plt.subplots(figsize=(12, 6))
+    # Adjust the figure size dynamically based on the number of cars
+    fig, ax = plt.subplots(figsize=(12, max(6, len(cars) * 1.5)))
     
     slots_per_hour = 60 // time_slot_minutes
     total_slots = (end_hour - start_hour) * slots_per_hour
@@ -222,7 +222,8 @@ def visualize_schedule(cars, schedule, time_slot_minutes=15, start_hour=0, end_h
                transform=ax.get_yaxis_transform())
     
     ax.grid(True, axis='x')
-    ax.set_xlim(start_hour, end_hour)
+    ax.set_xlim(start_hour - 1, end_hour + 1)  # Add padding to the x-axis
+    ax.set_ylim(-1, len(cars))  # Add padding to the y-axis
     
     ax.set_xticks(range(start_hour, end_hour + 1))
     ax.set_xticklabels([f'{h:02d}:00' for h in range(start_hour, end_hour + 1)])
