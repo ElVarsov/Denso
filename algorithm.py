@@ -217,9 +217,9 @@ def visualize_schedule(cars, schedule, time_slot_minutes=15, start_hour=0, end_h
     ax.set_yticks(range(len(cars)))
     ax.set_yticklabels([])  # Remove y-axis numbers
     
-    for i, car in enumerate(cars):
-        ax.text(-0.01, i, car.name, ha='right', va='center', fontsize=10, 
-               transform=ax.get_yaxis_transform())
+    # for i, car in enumerate(cars):
+    #     ax.text(-0.01, i, car.name, ha='right', va='center', fontsize=10, 
+    #            transform=ax.get_yaxis_transform())
     
     ax.grid(True, axis='x')
     ax.set_xlim(start_hour, end_hour)
@@ -258,10 +258,10 @@ def visualize_schedule(cars, schedule, time_slot_minutes=15, start_hour=0, end_h
     labels.append("Minimum required time")
     labels.append("Extra charging time")
     
-    ax.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), 
+    ax.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.25), 
              ncol=min(3, len(cars) + 2), fontsize=10)
     
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 1, 0.95])  # Adjust layout to show top and bottom fully
     return fig
 
 def analyze_schedule(cars, schedule, time_slot_minutes=15):
