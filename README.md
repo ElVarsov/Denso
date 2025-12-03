@@ -40,7 +40,6 @@ Tips
 Contributing / Next steps
 
 - Ideas: multi-charger support, variable charging power, cost-aware scheduling.
-- If you want a slide deck or a compact starter script to generate images, those can be added separately.
 
 Contact
 
